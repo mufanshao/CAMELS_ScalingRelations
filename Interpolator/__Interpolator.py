@@ -2,28 +2,39 @@ import numpy as np
 from scipy import interpolate
 import os
 
-avail_sims   = ['DMO', 'TNG', 'SIMBA']
+avail_sims   = ['DMO', 'TNG']
+avail_prop   = ['a_form', 'cvir', 'Mgas', 'Mstar', 'sigma3D', 'Spin']
+avail_mode   = ['High', 'Low']
 
 cwd_path = os.path.dirname(__file__)
 
-class CvirModel(object):
+class PropertyModel(object):
 
-    def __init__(self, sim):
-        '''
-        Class that predicts the concentration from a given simulation model.
+    """
+        Class that predicts halo properties from a given simulation model.
 
         The routine "prediction()" interpolates over pre-loaded tables to make 100
         predictions for each Mvir and z, given a set of input simulation parameters.
         The 100 predictions correspond to theoretical variation due to statistical uncertainty.
-        '''
+    """
+
+    def __init__(self, sim, property):
 
         if sim not in avail_sims:
-
             raise ValueError("Requested sim, %s, is not available. Choose one of "%sim + str(avail_sims))
+        
+        if property not in avail_prop:
+            raise ValueError("Requested sim, %s, is not available. Choose one of "%property + str(avail_prop))
 
-        self.sim = sim
+        if sim == 'DMO':
+            if (property == 'Mgas') | (property == 'Mstar'):
+                raise ValueError("Requested DMO sim, with baryonic property (%s). Select TNG sim instead" % property)
+        
+        self.sim  = sim
+        self.prop = property
 
         self._load_data()
+
 
     def _load_data(self):
 
@@ -38,7 +49,7 @@ class CvirModel(object):
 
         #Load all necessary quantities at once outside any likelihood function
         for i in range(34):
-            model_tmp = np.load(cwd_path + '/../Data/%s/Model_snap%d.npz'%(self.sim, i))
+            model_tmp = np.load(cwd_path + '/../Data/%s/%s/Model_snap%d.npz'%(self.sim, self.prop, i))
             intercept.append(model_tmp['intercept'])
             slopes.append(model_tmp['slopes'])
             Mvir_in.append(model_tmp['x'])
@@ -134,7 +145,7 @@ class CvirModel(object):
 
         numpy array:
 
-            Array of cvir (linear, not log). The array has dimension (100, Mvir.size),
+            Array of property (linear, not log). The array has dimension (100, Mvir.size),
             where the 100 predictions provide the statistical uncertainty in the prediction.
             If a requested Mvir or z value is outside the interpolation range,
             the corresponding entry in the output will contain np.NaN values.
@@ -165,8 +176,8 @@ class CvirModel(object):
 
         #Use bounds_error=False. Instead, the output will be np.NaN
         #when we cannot interpolate
-        cvir = interpolate.interpn(self.input_Mvir_and_z, theory.data.T,
+        prop = interpolate.interpn(self.input_Mvir_and_z, theory.data.T,
                                    np.vstack([Mvir, np.log10(a)]).T,
                                    bounds_error = False)
 
-        return 10**cvir.T
+        return 10**prop.T

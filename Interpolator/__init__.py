@@ -1,1 +1,1 @@
-from .__Interpolator import CvirModel, avail_sims
+from .__Interpolator import PropertyModel, avail_sims, avail_prop
